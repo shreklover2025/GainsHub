@@ -56,7 +56,7 @@ function saveDraft(){
  draftDirty=true;
  writeLocal(localKey()+'-draft-v1',{routine:$('routine').value,date:$('date').value,notes:$('sessionNotes').value,draft,editingId,editingOriginal,editingBaseVersion,collapsedExercises:[...collapsedExercises],skippedExercises:[...skippedExercises]});
  $('draftStatus').textContent='Unfinished workout saved on this device.';
- updateWorkoutProgress();
+ updateWorkoutAccount();
 }
 function restoreDraft(){
  draftDirty=false;resetWorkout(Object.keys(ROUTINES)[0]);
@@ -87,7 +87,13 @@ function clearDraft(){localStorage.removeItem(localKey()+'-draft-v1');draftDirty
 function startNew(routine){if(draftDirty&&!confirm('Discard the unfinished workout and start a new one?'))return;clearDraft();resetWorkout(routine);saveDraft()}
 
 function renderAll(){updateReferences();renderHome();renderProgression();if(!$('history').classList.contains('hide'))renderHistory();if(!$('progress').classList.contains('hide'))renderChart()}
-function status(message){$('cloudStatus').textContent=message}
+function status(message,email=null){
+ const container=$('cloudStatus');container.textContent=message;
+ if(email){
+  const address=document.createElement('span');address.className='cloud-email';address.textContent=email;
+  container.append(document.createTextNode(' '),address);
+ }
+}
 function authUI(){const signed=!!currentUser;$('authInputs').classList.toggle('hide',signed);$('signIn').classList.toggle('hide',signed);$('signUp').classList.toggle('hide',signed);$('signOut').classList.toggle('hide',!signed);$('syncNow').classList.toggle('hide',!signed);updateWorkoutAccount();status(!cloud?'Cloud not configured yet — see README.':signed?'Signed in: '+currentUser.email+' · Cloud sync available':'Sign in or create an account to sync across devices.')}
 function updateWorkoutAccount(){
  const label=currentUser?'Logging as '+(currentUser.email||'signed-in user'):'Logging as Guest · saved on this device only';
@@ -99,12 +105,6 @@ function workoutProgress(){
  const skipped=names.filter(name=>skippedExercises.has(name)).length;
  const done=names.filter(name=>!skippedExercises.has(name)&&draft[name].length&&draft[name].every(completeSet)).length;
  return {total:names.length,done,skipped,remaining:names.length-done-skipped};
-}
-function updateWorkoutProgress(){
- const {total,done,skipped,remaining}=workoutProgress();
- $('workoutProgress').textContent=done+' of '+total+' exercises done'+(skipped?' · '+skipped+' skipped':'')+(remaining?' · '+remaining+' remaining':' · Ready to save');
- $('workoutProgressBar').max=total||1;$('workoutProgressBar').value=done+skipped;
- updateWorkoutAccount();
 }
 async function syncCloud(){
  if(!cloud||!currentUser)return;
@@ -162,7 +162,8 @@ async function syncCloud(){
   for(const s of Object.values(outbox)){if(s.deleted)merged.delete(s.id);else if(!isBaseline(s))merged.set(s.id,s)}
   sessions=[...merged.values()];persist();renderAll();retryDelay=5000;
   $('syncNotice').textContent=syncNotice;
-  status(Object.keys(outbox).length?'Changes waiting to sync…':'Synced '+new Date().toLocaleTimeString()+' · '+currentUser.email);
+  if(Object.keys(outbox).length)status('Changes waiting to sync…');
+  else status('Synced '+new Date().toLocaleTimeString()+' ·',currentUser.email);
  }catch(error){
   if(active()){
    status('Sync failed. Changes remain on this device; retrying automatically. '+error.message);
@@ -227,7 +228,7 @@ function renderExercises(){
   const name=button.dataset.skipExercise;skippedExercises.add(name);collapsedExercises.delete(name);
   updateExerciseCollapse(name);saveDraft();button.closest('[data-exercise-card]').querySelector('[data-reopen]').focus();
  });
- updateWorkoutProgress();
+ updateWorkoutAccount();
 }
 function updateExerciseCollapse(name){
  const card=[...document.querySelectorAll('[data-exercise-card]')].find(card=>card.dataset.exerciseCard===name);
@@ -329,17 +330,6 @@ function exerciseHint(name){
  const last=result.last;
  return `<div class="progression-hint ${result.kind==='ready'?'ready':''}"><small>LAST LOGGED · ${esc(last.session.date)}</small><div class="mini">${last.exercise.sets.map(z=>`${esc(z.weight)} lb × ${esc(z.reps)}`).join(' · ')}</div><div class="mini">${esc(result.text)}</div></div>`
 }
-function renderHistory(){
- renderHistoryContent();
- const byId=new Map(sessions.map(session=>[session.id,session]));
- document.querySelectorAll('#historyList [data-edit]').forEach(button=>{
-  const session=byId.get(button.dataset.edit);
-  if(!session?.skippedExercises?.length)return;
-  const note=document.createElement('p');note.className='mini muted';
-  note.textContent='Skipped today: '+session.skippedExercises.join(', ');
-  button.closest('.card').append(note);
- });
-}
 function renderProgression(){
  const names=[...new Set(sessions.filter(s=>!s.deleted&&!isBaseline(s)).flatMap(s=>s.exercises.map(e=>e.name)))];
  const results=names.map(name=>({name,...progressionFor(name)})).filter(r=>r.kind!=='new').sort((a,b)=>(b.kind==='ready')-(a.kind==='ready')||a.name.localeCompare(b.name));
@@ -347,8 +337,8 @@ function renderProgression(){
 }
 
 function renderHome(){$('totalSessions').textContent=sessions.length;$('routineButtons').innerHTML=Object.keys(ROUTINES).map((r,i)=>`<button class="secondary" data-routine="${esc(r)}" style="display:block;width:100%;text-align:left;margin-bottom:9px"><span class="routine-number">0${i+1}</span><span class="routine-name">${esc(r)}</span><span class="routine-arrow" aria-hidden="true">↗</span></button>`).join('');document.querySelectorAll('[data-routine]').forEach(b=>b.onclick=()=>{startNew(b.dataset.routine);switchTab('logger')});$('recent').innerHTML=[...sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4).map(s=>`<div class="session"><strong>${esc(s.date)}</strong> · ${esc(s.routine)}<div class="mini muted">${s.exercises.length} exercises with exact sets</div></div>`).join('')||'<div class="empty">Your journal starts here.<br>Choose a session above to log your first workout.</div>'}
-function renderHistoryContent(){$('historyList').innerHTML=[...sessions].sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div class="card"><div class="row"><div><strong>${esc(s.date)}</strong><div class="muted mini">${esc(s.routine)}</div></div><div class="row"><button class="secondary" data-edit="${esc(s.id)}">Edit</button><button class="danger" data-delete="${esc(s.id)}">Delete</button></div></div>${s.exercises.map(e=>`<div class="exercise"><div class="exercise-title">${esc(e.name)}</div><div class="mini">${e.sets.map(z=>`${z.weight} lb × ${z.reps}`).join(' · ')}</div></div>`).join('')}${(s.ranges||[]).length?`<details><summary>Additional records (set counts unspecified)</summary>${s.ranges.map(e=>`<p class="mini">${esc(e.name)}: ${e.weight} lb × ${esc(e.reps)}; sets ${esc(e.sets)}</p>`).join('')}</details>`:''}${s.notes?`<p class="mini muted">${esc(s.notes)}</p>`:''}</div>`).join('');if(!sessions.length)$('historyList').innerHTML='<div class="card empty">No workouts yet.<br>Your saved sessions will appear here.</div>';document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editSession(b.dataset.edit));document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{if(confirm('Delete this workout?')){cloudDelete(b.dataset.delete)}})}
 function renderChart(){const name=$('chartExercise').value,metric=$('metric').value;let data=sessions.flatMap(s=>s.exercises.filter(e=>e.name===name&&e.sets.length).map(e=>{let v=metric==='top'?Math.max(...e.sets.map(x=>x.weight)):metric==='volume'?e.sets.reduce((a,x)=>a+x.weight*x.reps,0):Math.max(...e.sets.map(x=>x.weight*(1+x.reps/30)));return{date:s.date,v}})).sort((a,b)=>a.date.localeCompare(b.date));const svg=$('chart');if(!data.length){svg.innerHTML='<text x="170" y="110" fill="#bfa4ad" text-anchor="middle" font-size="14">No logged data for this exercise yet</text>';$('chartDetail').textContent='Log a workout to start your chart.';return}const W=340,H=220,l=42,r=14,t=18,b=37;let min=Math.min(...data.map(d=>d.v)),max=Math.max(...data.map(d=>d.v));let pad=Math.max(1,(max-min)*.2);min=Math.max(0,min-pad);max+=pad;const X=i=>l+(data.length===1?(W-l-r)/2:i*(W-l-r)/(data.length-1));const Y=v=>t+(max-v)/(max-min)*(H-t-b);let path=data.map((d,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(d.v).toFixed(1)}`).join(' ');svg.innerHTML=`<line x1="${l}" y1="${H-b}" x2="${W-r}" y2="${H-b}" stroke="#64424c"/><line x1="${l}" y1="${t}" x2="${l}" y2="${H-b}" stroke="#64424c"/>${[0,.5,1].map(p=>`<text x="${l-7}" y="${Y(min+p*(max-min))+4}" text-anchor="end" fill="#bfa4ad" font-size="10">${Math.round(min+p*(max-min))}</text>`).join('')}<path d="${path}" stroke="#ff6861" stroke-width="3" fill="none"/>${data.map((d,i)=>`<circle cx="${X(i)}" cy="${Y(d.v)}" r="4" fill="#ffc2b8"/>`).join('')}<text x="${l}" y="${H-9}" fill="#bfa4ad" font-size="10">${esc(data[0].date)}</text><text x="${W-r}" y="${H-9}" text-anchor="end" fill="#bfa4ad" font-size="10">${esc(data.at(-1).date)}</text>`;$('chartDetail').textContent=`${data.length} recorded point(s) · Latest: ${Math.round(data.at(-1).v*10)/10} ${metric==='estimated'?'lb estimated 1RM':metric==='volume'?'lb total volume':'lb top weight'}. Estimated 1RM is a rough formula, not a tested max.`}
+$('historyRoutine').onchange=renderHistory;
 $('chartExercise').onchange=renderChart;$('metric').onchange=renderChart;
 $('export').onclick=()=>{const blob=new Blob([JSON.stringify({app:'Strength Tracker',version:1,sessions},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`strength-tracker-backup-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 $('import').onchange=async e=>{

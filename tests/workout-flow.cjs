@@ -23,10 +23,10 @@ const {createServer}=require('../tools/serve.cjs');
   const first=page.locator('[data-exercise-card]').first();
   await first.locator('[data-field="weight"]').fill('110');await first.locator('[data-field="reps"]').fill('9');
   await first.locator('[data-complete]').check();
-  assert.match(await page.locator('#workoutProgress').textContent(),/1 of 8 exercises done/);
+  assert.equal(await page.evaluate(()=>workoutProgress().done),1);
   // Skip is reversible, even when completed sets have already been entered.
   await first.getByRole('button',{name:'Skip today'}).click();
-  assert.match(await page.locator('#workoutProgress').textContent(),/0 of 8 exercises done · 1 skipped/);
+  assert.deepEqual(await page.evaluate(()=>workoutProgress()),{total:8,done:0,skipped:1,remaining:7});
   await first.getByRole('button',{name:'Reopen'}).click();
   assert.equal(await first.locator('[data-field="weight"]').inputValue(),'110');
   assert.equal(await first.locator('[data-complete]').isChecked(),true);
@@ -35,22 +35,20 @@ const {createServer}=require('../tools/serve.cjs');
   await page.locator('#sessionNotes').fill('Preserve across updates');
   await page.reload();
   await page.evaluate(()=>{cloud=null;currentUser={id:'alice',email:'alice@example.invalid'};loadLocal();authUI();switchTab('logger')});
-  assert.match(await page.locator('#workoutProgress').textContent(),/1 of 8 exercises done · 1 skipped/);
+  assert.deepEqual(await page.evaluate(()=>workoutProgress()),{total:8,done:1,skipped:1,remaining:6});
   assert.equal(await first.locator('.exercise-body').isVisible(),false);
   assert.equal(await page.locator('#sessionNotes').inputValue(),'Preserve across updates');
   await page.locator('[data-exercise-card]').nth(1).getByRole('button',{name:'Reopen'}).click();
   await page.locator('[data-exercise-card]').nth(1).getByRole('button',{name:'Skip today'}).click();
-  // Finish button remains in view at either end of a long workout.
-  for(const y of [0,10000]){
-   await page.evaluate(y=>scrollTo(0,y),y);
-   const bounds=await page.locator('#save').boundingBox();assert.ok(bounds.y>=0&&bounds.y+bounds.height<844);
-  }
+  // Save controls are in the form, with no floating progress panel.
+  assert.equal(await page.locator('#workoutProgress').count(),0);
+  assert.equal(await page.locator('#workoutFinish').evaluate(el=>getComputedStyle(el).position),'static');
   acceptDialogs=false;await page.locator('#save').click();
   assert.equal(await page.evaluate(()=>sessions.length),1);
   assert.equal(await page.locator('#saveConfirmation').isVisible(),false);
   acceptDialogs=true;
   for(let i=2;i<8;i++)await page.locator('[data-exercise-card]').nth(i).getByRole('button',{name:'Skip today'}).click();
-  assert.match(await page.locator('#workoutProgress').textContent(),/1 of 8 exercises done · 7 skipped · Ready to save/);
+  assert.deepEqual(await page.evaluate(()=>workoutProgress()),{total:8,done:1,skipped:7,remaining:0});
   await page.locator('#save').click();
   assert.equal(await page.locator('#saveConfirmation').isVisible(),true);
   assert.match(await page.locator('#saveConfirmationText').textContent(),/1 exercises · 1 sets saved · 7 skipped/);
@@ -74,16 +72,15 @@ const {createServer}=require('../tools/serve.cjs');
   await Promise.all([page.waitForEvent('load'),page.locator('#updateApp').click()]);
   await page.waitForFunction(()=>!document.querySelector('#logger').classList.contains('hide'));
   assert.equal(await page.locator('#sessionNotes').inputValue(),'Update keeps this draft');
-  assert.match(await page.locator('#workoutProgress').textContent(),/1 of 8 exercises done · 1 skipped/);
+  assert.deepEqual(await page.evaluate(()=>workoutProgress()),{total:8,done:1,skipped:1,remaining:6});
   assert.equal(await first.locator('.exercise-body').isVisible(),false);
   await first.getByRole('button',{name:'Reopen'}).click();assert.equal(await first.locator('[data-field="weight"]').inputValue(),'125');
-  const finish=await page.locator('#save').boundingBox();assert.ok(finish.y>=0&&finish.y+finish.height<844,JSON.stringify(finish));
   require('node:fs').mkdirSync('test-results',{recursive:true});
   await page.screenshot({path:'test-results/workout-mobile.png'});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).map(el=>({tag:el.tagName,id:el.id,class:el.className,right:el.getBoundingClientRect().right})).slice(0,15))));
   await page.setViewportSize({width:1440,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);
-  console.log('PASS: progress, skip/reopen and draft recovery, active account, fixed finish button, save confirmation and records, skipped backup data, real waiting-worker update with draft preservation.');
+  console.log('PASS: skip/reopen and draft recovery, active account, inline save controls without floating progress, save confirmation and records, skipped backup data, real waiting-worker update with draft preservation.');
   await context.close();
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve))}
 })().catch(error=>{console.error(error);process.exitCode=1});

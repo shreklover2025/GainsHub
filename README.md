@@ -10,12 +10,14 @@ Install Node.js LTS, then run `npm start` from this folder and open http://127.0
 
 The Guide tab in the app provides step-by-step instructions for accounts, logging sets, Done and Skip today, saving, progress, backups, offline use, and updates. It is also available offline once the app shell is cached.
 
+History uses compact expandable cards grouped by month, newest first. Filter by routine, then select View workout to see a set-by-set table, notes, skipped exercises, and Edit/Delete controls. Expanded cards stay open during background syncing in the same account.
+
 - Unfinished workouts save automatically on this device, separately for guests and each signed-in account. Reopen the Log workout tab to resume after a reload.
 - Enter weight and reps, then check the set's completion box. Only checked sets are saved; existing sessions open for editing with their recorded sets checked.
 - Checking a set starts the selected rest timer. Start and Stop also work independently. Time is calculated from a deadline, so returning from another tab shows the correct remaining time; no notification is promised while the app is closed.
 - Select Done after checking off all sets for an exercise to collapse its card. Reopen expands it for review or changes. Collapsed cards keep their sets and remain collapsed when a draft is restored. Save workout still saves the full session, including collapsed exercises.
 - Skip today collapses an exercise and leaves it out of the saved sets. Reopen restores its entered sets so you can change your mind. Skips are retained in drafts, backups, cloud data, and History.
-- The finish bar shows completed, skipped, and remaining exercises and stays visible while logging. Finish & Save Workout saves checked sets; if some exercises remain unfinished, it asks before finishing a partial session. At least one completed set is required. A confirmation distinguishes device saving from cloud sync.
+- Finish & Save Workout is at the bottom of the workout form. It saves checked sets; if some exercises remain unfinished, it asks before finishing a partial session. At least one completed set is required. A confirmation distinguishes device saving from cloud sync.
 - The active account (or Guest) appears above the form and beside the finish button. Check it before logging, especially on shared devices.
 - Saving highlights a new highest weight or more reps at the same weight compared with earlier history loaded for that account. Assisted pull-ups celebrate reduced assistance; standing and seated calf records stay separate. First logs establish a benchmark rather than a new record.
 - Use last workout's sets copies weights and reps for exercises in the selected routine. Copied sets start unchecked.
@@ -39,6 +41,7 @@ Visit once online and wait for “Ready to reopen offline on this device.” The
 - `assets/`: original artwork and app icons
 - `js/app.js`: workout forms, draft storage, account UI, charts, and sync orchestration
 - `js/records.js`: personal-record comparisons
+- `js/history.js`: expandable workout history, month grouping, and routine filtering
 - `js/updates.js`: update notices and draft preservation before reloads
 - `js/data.js`: backup validation and normalization
 - `js/sync.js`: paginated cloud reads and conditional writes
