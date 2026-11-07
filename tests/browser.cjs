@@ -102,6 +102,23 @@ const {fake}=require('./fake-cloud.cjs');
   await page.waitForFunction(()=>!syncBusy);
   assert.equal(await page.locator('#cloudStatus .cloud-email').textContent(),'test@example.invalid');
   assert.equal(await page.locator('#cloudStatus .cloud-email').evaluate(el=>getComputedStyle(el).display),'block');
+  await page.evaluate(()=>status('Synced 9:29:06 PM ·','jakelian15@gmail.com'));
+  for(const width of [320,393,600]){
+   await page.setViewportSize({width,height:844});
+   const layout=await page.locator('#cloudStatus').evaluate(el=>{
+    const time=document.createRange();time.selectNodeContents(el.firstChild);
+    const email=document.createRange();email.selectNodeContents(el.querySelector('.cloud-email'));
+    return {timeLines:time.getClientRects().length,emailLines:email.getClientRects().length,width:el.getBoundingClientRect().width};
+   });
+   assert.equal(layout.timeLines,1,'Sync time should fit on one line at '+width);
+   assert.equal(layout.emailLines,1,'Normal email should fit on one line at '+width);
+   assert.ok(layout.width>=width-70,'Sync status should use full card width');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  require('node:fs').mkdirSync('test-results',{recursive:true});
+  await page.setViewportSize({width:393,height:844});
+  await page.locator('#accountPanel').screenshot({path:'test-results/cloud-mobile.png'});
+  await page.setViewportSize({width:390,height:844});
   assert.match(await page.locator('#syncNotice').textContent(),/conflict/);
   await page.evaluate(async()=>{
    const workout={id:'open-edit',date:'2026-11-06',routine:'Upper Body',notes:'Original',exercises:[{name:'Barbell Bench Press',sets:[{weight:150,reps:8}]}]};
