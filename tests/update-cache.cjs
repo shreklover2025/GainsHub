@@ -14,7 +14,7 @@ const {createServer}=require('../tools/serve.cjs');
   }
   if(path==='/sw.js'){
    res.writeHead(200,{'Content-Type':'text/javascript','Cache-Control':'no-store'});
-   return res.end(fs.readFileSync('sw.js','utf8').replace('gainshub-shell-v15','gainshub-shell-cache-test-'+version));
+   return res.end(fs.readFileSync('sw.js','utf8').replace(/gainshub-shell-v\d+/,'gainshub-shell-cache-test-'+version));
   }
   fallback.emit('request',req,res);
  });

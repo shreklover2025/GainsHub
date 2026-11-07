@@ -22,6 +22,14 @@ const {fake}=require('./fake-cloud.cjs');
   await page.locator('[data-routine]').first().click();
   const weight=page.locator('#exerciseList [data-field="weight"]').first();
   const reps=page.locator('#exerciseList [data-field="reps"]').first();
+  await page.evaluate(()=>{
+   for(const routine of Object.keys(ROUTINES)){
+    initDraft(routine);
+    if(Object.values(draft).some(sets=>sets.some(set=>set.weight!=='')))throw Error('Preset weight leaked into a fresh workout');
+   }
+   initDraft('Upper Body');
+  });
+  assert.deepEqual(await page.locator('#exerciseList [data-field="weight"]').evaluateAll(inputs=>inputs.map(input=>input.value)),Array(8).fill(''));
   await weight.fill('135');await reps.fill('8');
   const firstExercise=page.locator('[data-exercise-card]').first();
   await firstExercise.getByRole('button',{name:'Done',exact:true}).click();
@@ -45,6 +53,8 @@ const {fake}=require('./fake-cloud.cjs');
   await page.locator('#historyList .history-summary').first().click();
   assert.match(await page.locator('#historyList .history-table').innerText(),/135 lb\s+8/);
   await page.locator('[data-tab="dashboard"]').click();await page.locator('[data-routine]').first().click();
+  assert.equal(await weight.inputValue(),'135');
+  assert.equal(await reps.inputValue(),'');
   await page.locator('#useLast').click();assert.equal(await reps.inputValue(),'8');
   assert.equal(await page.locator('[data-reference="Barbell Bench Press"]').textContent(),'Reference: 135 lb');
   assert.equal(await page.locator('#exerciseList [data-complete]').first().isChecked(),false);
@@ -54,6 +64,18 @@ const {fake}=require('./fake-cloud.cjs');
   assert.equal(await page.evaluate(()=>sessions.length),before);
   // Exercise the complete app's conflict flow against a deterministic in-memory API.
   await page.addScriptTag({content:fake.toString()});
+  await page.evaluate(()=>{
+   const originalSessions=sessions;
+   sessions=[{id:'suggestions',date:today(),routine:'Upper Body',exercises:[{name:'Barbell Bench Press',sets:[{weight:90,reps:8},{weight:100,reps:8}]},{name:'Chest Dips',sets:[{weight:0,reps:8}]}]}];
+   initDraft('Upper Body');
+   if(draft['Barbell Bench Press'][0].weight!=='100'||draft['Chest Dips'][0].weight!=='0')throw Error('Last set weight, including zero, was not reused');
+   const input=document.querySelector('#sets-0 [data-field="weight"]');input.value='105';input.dispatchEvent(new Event('input'));
+   sessions[0].exercises[0].sets.push({weight:110,reps:8});refreshSuggestedWeights();
+   if(input.value!=='105')throw Error('History refresh overwrote entered weight');
+   initDraft('Upper Body');sessions[0].exercises[0].sets.push({weight:115,reps:8});refreshSuggestedWeights();
+   if(draft['Barbell Bench Press'][0].weight!=='115')throw Error('Untouched suggested weight did not update');
+   sessions=originalSessions;
+  });
   await page.evaluate(()=>{
    for(const routine of ['Lower — Squat Focus','Lower — Deadlift Focus']){
     resetWorkout(routine);

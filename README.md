@@ -13,6 +13,7 @@ The Guide tab in the app provides step-by-step instructions for accounts, loggin
 History uses compact expandable cards grouped by month, newest first. Filter by routine, then select View workout to see a set-by-set table, notes, skipped exercises, and Edit/Delete controls. Expanded cards stay open during background syncing in the same account.
 
 - Unfinished workouts save automatically on this device, separately for guests and each signed-in account. Reopen the Log workout tab to resume after a reload.
+- New exercises start with the weight from the last recorded set in your own saved history, or blank if there is no history. No preset starting weights are used. Cloud history can update untouched suggestions without replacing entered values. Existing drafts keep their entries; start a new workout to replace values carried over from an older draft.
 - Enter weight and reps, then check the set's completion box. Only checked sets are saved; existing sessions open for editing with their recorded sets checked.
 - Checking a set starts the selected rest timer. Start and Stop also work independently. Time is calculated from a deadline, so returning from another tab shows the correct remaining time; no notification is promised while the app is closed.
 - Select Done after checking off all sets for an exercise to collapse its card. Reopen expands it for review or changes. Collapsed cards keep their sets and remain collapsed when a draft is restored. Save workout still saves the full session, including collapsed exercises.

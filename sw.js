@@ -1,5 +1,5 @@
 /* Cache only the public app shell. Account requests and workout data never enter CacheStorage. */
-const CACHE='gainshub-shell-v15';
+const CACHE='gainshub-shell-v16';
 const SHELL=['./','./index.html','./styles.css','./config.js','./js/data.js','./js/sync.js','./js/records.js','./js/history.js','./js/updates.js','./js/app.js','./vendor/supabase.min.js','./assets/training-art.png','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png','./manifest.webmanifest'];
 self.addEventListener('install',event=>{
   // Bypass the HTTP cache: a new worker must not install an older cached stylesheet.

@@ -1,9 +1,9 @@
 
 'use strict';
 const ROUTINES={
-'Upper Body':[['Barbell Bench Press','235'],['Barbell Bent-Over Row','205'],['Barbell Overhead Press','145'],['Assisted Pull-Ups','25–40 assistance'],['Chest Dips','Bodyweight'],['Barbell Incline Bench Press','155'],['Cable Rows','209'],['Dumbbell Lateral Raises','25 each']],
-'Lower — Squat Focus':[['Barbell Back Squat','275'],['Romanian Deadlift','295'],['Belt Squat Machine','320'],['Standing Calf Raises','290'],['Seated Calf Raises',''],['Leg Extensions','235'],['Leg Curls','150']],
-'Lower — Deadlift Focus':[['Conventional Deadlift','335 / 315'],['Barbell Bulgarian Split Squat','135 / 165'],['Belt Squat Machine','320'],['Standing Calf Raises','310'],['Seated Calf Raises',''],['Leg Extensions','235'],['Leg Curls','140']]};
+'Upper Body':[['Barbell Bench Press',''],['Barbell Bent-Over Row',''],['Barbell Overhead Press',''],['Assisted Pull-Ups',''],['Chest Dips',''],['Barbell Incline Bench Press',''],['Cable Rows',''],['Dumbbell Lateral Raises','']],
+'Lower — Squat Focus':[['Barbell Back Squat',''],['Romanian Deadlift',''],['Belt Squat Machine',''],['Standing Calf Raises',''],['Seated Calf Raises',''],['Leg Extensions',''],['Leg Curls','']],
+'Lower — Deadlift Focus':[['Conventional Deadlift',''],['Barbell Bulgarian Split Squat',''],['Belt Squat Machine',''],['Standing Calf Raises',''],['Seated Calf Raises',''],['Leg Extensions',''],['Leg Curls','']]};
 const isBaseline=s=>s?.baseline===true||s?.id==='baseline-2026-10-21';
 let sessions=[];let currentUser=null;let cloud=null;let syncBusy=false;let syncAgain=false;
 let knownVersions={};let draftDirty=false;let renderedRoutine='';let retryDelay=5000;let retryTimer;let syncNotice="";let pendingWrites={};let editingId=null;let editingOriginal=null;
@@ -160,7 +160,7 @@ async function syncCloud(){
    merged.set(row.id,WorkoutData.normalizeSession(row.session));
   }
   for(const s of Object.values(outbox)){if(s.deleted)merged.delete(s.id);else if(!isBaseline(s))merged.set(s.id,s)}
-  sessions=[...merged.values()];persist();renderAll();retryDelay=5000;
+  sessions=[...merged.values()];persist();refreshSuggestedWeights();renderAll();retryDelay=5000;
   $('syncNotice').textContent=syncNotice;
   if(Object.keys(outbox).length)status('Changes waiting to sync…');
   else status('Synced '+new Date().toLocaleTimeString()+' ·',currentUser.email);
@@ -204,7 +204,24 @@ function today(){let d=new Date();return `${d.getFullYear()}-${String(d.getMonth
 function switchTab(tab){document.querySelectorAll('main>section').forEach(x=>x.classList.toggle('hide',x.id!==tab));document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));if(tab==='dashboard')renderHome();if(tab==='history')renderHistory();if(tab==='progress'){renderChart();renderProgression()}scrollTo(0,0)}
 document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
 $('routine').innerHTML=Object.keys(ROUTINES).map(x=>`<option>${esc(x)}</option>`).join('');$('chartExercise').innerHTML=allNames.map(x=>`<option>${esc(x)}</option>`).join('');$('date').value=today();
-function initDraft(routine){draft={};collapsedExercises=new Set();skippedExercises=new Set();(ROUTINES[routine]||[]).forEach(([name,reference])=>{let num=reference.match(/^\d+/);draft[name]=[{weight:reference==='Bodyweight'?'0':num?num[0]:'',reps:''}]});renderExercises()}
+function previousWeight(name){
+ const last=latestExercise(name,editingId);
+ const weight=last?.exercise.sets.at(-1)?.weight;
+ return weight!==undefined&&Number.isFinite(Number(weight))&&Number(weight)>=0?String(weight):'';
+}
+function initDraft(routine){draft={};collapsedExercises=new Set();skippedExercises=new Set();(ROUTINES[routine]||[]).forEach(([name])=>{draft[name]=[{weight:previousWeight(name),reps:'',completed:false,autoWeight:true}]});renderExercises()}
+function refreshSuggestedWeights(){
+ let changed=false;
+ Object.entries(draft).forEach(([name,sets],exerciseIndex)=>sets.forEach((set,index)=>{
+  if(!set.autoWeight||set.completed||set.reps!=='')return;
+  const input=$('sets-'+exerciseIndex)?.querySelector('[data-field="weight"][data-index="'+index+'"]');
+  if(input===document.activeElement)return;
+  const weight=previousWeight(name);
+  if(String(set.weight)===weight)return;
+  set.weight=weight;if(input)input.value=weight;changed=true;
+ }));
+ if(changed&&draftDirty)saveDraft();
+}
 function renderExercises(){
  renderedRoutine=$('routine').value;
  $('exerciseList').innerHTML=Object.keys(draft).map((name,i)=>`<div class="card" data-exercise-card="${esc(name)}"><div class="row"><div class="exercise-title">${esc(name)}</div><span class="pill" data-reference="${esc(name)}">${esc(referenceLabel(name))}</span><span class="mini muted" data-done-summary hidden></span><button class="ghost" data-reopen data-toggle-exercise="${esc(name)}" aria-controls="exercise-body-${i}" hidden>Reopen</button></div><div class="exercise-body" id="exercise-body-${i}"><small>${name==='Assisted Pull-Ups'?'Enter assistance amount in lb.':name==='Chest Dips'?'Enter 0 for bodyweight, or added load in lb.':'Weight in lb · completed reps'}</small><div data-exercise-hint="${esc(name)}">${exerciseHint(name)}</div><div id="sets-${i}"></div><div class="row exercise-actions"><button class="secondary" data-add="${esc(name)}">+ Add set</button><button class="ghost" data-skip-exercise="${esc(name)}">Skip today</button><button data-toggle-exercise="${esc(name)}" aria-controls="exercise-body-${i}">Done</button></div></div></div>`).join('');
@@ -264,7 +281,7 @@ $('cancelEdit').onclick=()=>{if(!confirm('Discard changes to this workout?'))ret
 function renderSets(name){
  const el=$('sets-'+Object.keys(draft).indexOf(name));
  el.innerHTML=draft[name].map((s,i)=>`<div class="setrow"><label class="set-complete"><input type="checkbox" data-complete="${i}" aria-label="${esc(name)} set ${i+1} completed" ${s.completed?'checked':''}><span>${i+1}</span></label><input aria-label="${esc(name)} set ${i+1} weight" inputmode="decimal" type="number" min="0" step="0.5" placeholder="lb" data-field="weight" data-index="${i}" value="${esc(s.weight)}"><input aria-label="${esc(name)} set ${i+1} reps" inputmode="numeric" type="number" min="1" max="100" placeholder="reps" data-field="reps" data-index="${i}" value="${esc(s.reps)}"><button class="danger" aria-label="Remove set" data-remove="${i}">×</button></div>`).join('');
- el.querySelectorAll('[data-field]').forEach(inp=>inp.oninput=()=>{draft[name][+inp.dataset.index][inp.dataset.field]=inp.value;saveDraft()});
+ el.querySelectorAll('[data-field]').forEach(inp=>inp.oninput=()=>{const set=draft[name][+inp.dataset.index];set[inp.dataset.field]=inp.value;set.autoWeight=false;saveDraft()});
  el.querySelectorAll('[data-complete]').forEach(inp=>inp.onchange=()=>{
   const set=draft[name][+inp.dataset.complete];
   if(inp.checked&&(set.weight===''||set.reps===''||!Number.isFinite(Number(set.weight))||Number(set.weight)<0||!Number.isInteger(Number(set.reps))||Number(set.reps)<1||Number(set.reps)>100)){
