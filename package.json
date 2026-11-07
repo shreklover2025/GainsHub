@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node tools/serve.cjs",
     "test": "node --test tests/*.test.cjs",
-    "test:browser": "node tests/browser.cjs && node tests/workout-flow.cjs"
+    "test:browser": "node tests/browser.cjs && node tests/workout-flow.cjs && node tests/update-cache.cjs"
   },
   "devDependencies": {
     "playwright-core": "1.56.1"
