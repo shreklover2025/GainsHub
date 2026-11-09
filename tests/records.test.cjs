@@ -31,3 +31,12 @@ test('excluded records include self, deleted, baseline, and future workouts',()=
  const baseline={...future,id:'baseline',date:'2026-11-01',baseline:true};
  assert.deepEqual(WorkoutRecords.findRecords(current,[current,future,deleted,baseline]),[]);
 });
+test('signed bodyweight records increase through assistance, bodyweight, and added load',()=>{
+ for(const name of ['Assisted Pull-Ups','Chest Dips']){
+  const older={...workout('old','2026-11-05',name,[{weight:-40,reps:8}]),weightConvention:'signed-v1'};
+  const less={...workout('less','2026-11-06',name,[{weight:-25,reps:8}]),weightConvention:'signed-v1'};
+  assert.equal(WorkoutRecords.findRecords(less,[older])[0].kind,'weight');
+  const added={...less,id:'added',exercises:[{name,sets:[{weight:10,reps:8}]}]};
+  assert.match(WorkoutRecords.findRecords(added,[older])[0].text,/Added load/);
+ }
+});

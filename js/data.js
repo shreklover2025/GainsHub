@@ -3,18 +3,23 @@
   'use strict';
   const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
   const text = (value, max) => typeof value === 'string' && value.length <= max;
-  const exerciseName = name => name === 'Calf Raises' ? 'Standing Calf Raises' : name;
+  const exerciseName = name => name === 'Calf Raises' ? 'Standing Calf Raises' : name === 'Assisted Pull-Ups' ? 'Pull-Ups' : name;
+  const signedLoad = name => exerciseName(name) === 'Pull-Ups' || name === 'Chest Dips';
+  const validWeight = (name,weight) => Number.isFinite(weight) && (signedLoad(name) || weight >= 0);
+  const normalizeWeight = (name,weight,convention) => exerciseName(name) === 'Pull-Ups' && convention !== 'signed-v1' && weight > 0 ? -weight : weight;
+  const formatWeight = (name,weight) => signedLoad(name) && Number(weight)>0 ? '+'+weight : String(weight);
   function renameSessionExercises(session) {
     if (!Array.isArray(session.exercises)) return session;
     const exercises = new Map();
     for (const exercise of session.exercises) {
       const name = exerciseName(exercise.name);
-      if (exercises.has(name)) exercises.get(name).sets.push(...exercise.sets);
-      else exercises.set(name, {...exercise, name, sets: [...exercise.sets]});
+      const sets=exercise.sets.map(set=>({...set,weight:normalizeWeight(name,set.weight,session.weightConvention)}));
+      if (exercises.has(name)) exercises.get(name).sets.push(...sets);
+      else exercises.set(name, {...exercise, name, sets});
     }
-    return {...session, exercises: [...exercises.values()],
+    return {...session, weightConvention:'signed-v1', exercises: [...exercises.values()],
       ...(session.skippedExercises ? {skippedExercises: session.skippedExercises.map(exerciseName)} : {}),
-      ...(session.ranges ? {ranges: session.ranges.map(e => ({...e, name: exerciseName(e.name)}))} : {})};
+      ...(session.ranges ? {ranges: session.ranges.map(e => ({...e, name: exerciseName(e.name),weight:normalizeWeight(e.name,e.weight,session.weightConvention)}))} : {})};
   }
   function validDate(value) {
     return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
@@ -31,12 +36,12 @@
         throw Error('Invalid or duplicate exercise');
       names.add(e.name);
       return {name: e.name, sets: e.sets.map(z => {
-        if (!record(z) || typeof z.weight !== 'number' || !Number.isFinite(z.weight) || z.weight < 0 ||
+        if (!record(z) || typeof z.weight !== 'number' || !validWeight(e.name,z.weight) ||
             !Number.isInteger(z.reps) || z.reps < 1 || z.reps > 100) throw Error('Invalid weight or reps');
         return {weight: z.weight, reps: z.reps};
       })};
     });
-    const result = {id: s.id, date: s.date, routine: s.routine, notes: s.notes || '', exercises};
+    const result = {id: s.id, date: s.date, routine: s.routine, notes: s.notes || '', exercises,weightConvention:s.weightConvention};
     if (s.skippedExercises !== undefined) {
       if (!Array.isArray(s.skippedExercises) || s.skippedExercises.length > 200 ||
           s.skippedExercises.some(name => !text(name, 200) || !name.trim() || ['__proto__','constructor','prototype'].includes(name)))
@@ -48,7 +53,7 @@
     if (s.ranges !== undefined) {
       if (!Array.isArray(s.ranges) || s.ranges.length > 200) throw Error('Invalid additional records');
       result.ranges = s.ranges.map(e => {
-        if (!record(e) || !text(e.name, 200) || !Number.isFinite(e.weight) || e.weight < 0 ||
+        if (!record(e) || !text(e.name, 200) || !validWeight(e.name,e.weight) ||
             !['string','number'].includes(typeof e.reps) || !['string','number'].includes(typeof e.sets) ||
             String(e.reps).length > 100 || String(e.sets).length > 100) throw Error('Invalid additional record');
         return {name:e.name, weight:e.weight, reps:String(e.reps), sets:String(e.sets)};
@@ -67,5 +72,5 @@
       return clean;
     });
   }
-  root.WorkoutData = {normalizeSession, parseBackup, validDate, exerciseName, renameSessionExercises};
+  root.WorkoutData = {normalizeSession, parseBackup, validDate, exerciseName, renameSessionExercises, signedLoad,validWeight,normalizeWeight,formatWeight};
 })(globalThis);

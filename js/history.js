@@ -1,6 +1,24 @@
 /* Compact history; presentation state is separate from saved workout data. */
 let historyOwner=null;
 let expandedHistory=new Set();
+function renderDraftLog(){
+ const container=$('historyDraft');if(!container)return;
+ let saved;
+ try{saved=JSON.parse(localStorage.getItem(localKey()+'-draft-v1'))}catch{}
+ const entries=Object.entries(saved?.draft||{});
+ const started=entries.some(([,sets])=>Array.isArray(sets)&&sets.some(set=>set.completed||set.reps!==''&&set.reps!==undefined||set.autoWeight===false));
+ if(!saved||saved.editingId||!started){container.replaceChildren();return}
+ const skipped=new Set(saved.skippedExercises||[]);
+ const completed=entries.filter(([name])=>!skipped.has(name)).reduce((count,[name,sets])=>count+sets.filter(set=>completeSet(set,name)).length,0);
+ container.innerHTML=`<article class="card draft-log"><div class="draft-log-heading"><span class="draft-log-badge">In progress</span><span class="mini muted">Draft · this device</span></div><h3>${esc(saved.routine)}</h3><p class="mini muted">${esc(saved.date||'Date not selected')} · ${completed} completed set${completed===1?'':'s'}${saved.savedAt?' · Saved '+esc(new Date(saved.savedAt).toLocaleTimeString()):''}</p><p class="mini muted">Your entered sets are saved automatically. Resume and select Finish &amp; Save Workout when you’re ready.</p><div class="row draft-log-actions"><button id="resumeDraft">Resume workout</button><button id="deleteDraft" class="danger">Delete draft</button></div></article>`;
+ $('resumeDraft').onclick=()=>{restoreDraft();switchTab('logger')};
+ $('deleteDraft').onclick=()=>{
+  if(!confirm('Delete this unfinished workout draft? Its entered sets and notes will be removed from this device. Saved workouts will be kept.'))return;
+  clearDraft();resetWorkout(Object.hasOwn(ROUTINES,saved.routine)?saved.routine:Object.keys(ROUTINES)[0]);
+  stopRest();showSetError('');
+  renderHistory();$('historyRoutine').focus();
+ };
+}
 function historyDate(date,monthOnly=false){
  const [year,month,day]=date.split('-').map(Number);
  return new Intl.DateTimeFormat(undefined,monthOnly?{month:'long',year:'numeric'}:{month:'short',day:'numeric',year:'numeric'})
@@ -9,9 +27,10 @@ function historyDate(date,monthOnly=false){
 function historyTable(session){
  const exercises=session.exercises.filter(exercise=>exercise.sets.length);
  if(!exercises.length)return '<p class="mini muted">No individual sets recorded.</p>';
- return `<table class="history-table"><caption class="visually-hidden">${esc(session.routine)} on ${esc(session.date)} — recorded sets</caption><thead><tr><th scope="col">Exercise</th><th scope="col">Set</th><th scope="col">Weight</th><th scope="col">Reps</th></tr></thead>${exercises.map(exercise=>`<tbody>${exercise.sets.map((set,index)=>`<tr>${index===0?`<th scope="rowgroup" rowspan="${exercise.sets.length}">${esc(exercise.name)}${exercise.name==='Assisted Pull-Ups'?'<small>Assistance</small>':exercise.name==='Chest Dips'?'<small>Added load</small>':/Dumbbell/.test(exercise.name)?'<small>Per dumbbell</small>':''}</th>`:''}<td>${index+1}</td><td>${esc(set.weight)} lb</td><td>${esc(set.reps)}</td></tr>`).join('')}</tbody>`).join('')}</table>`;
+ return `<table class="history-table"><caption class="visually-hidden">${esc(session.routine)} on ${esc(session.date)} — recorded sets</caption><thead><tr><th scope="col">Exercise</th><th scope="col">Set</th><th scope="col">Weight</th><th scope="col">Reps</th></tr></thead>${exercises.map(exercise=>`<tbody>${exercise.sets.map((set,index)=>`<tr>${index===0?`<th scope="rowgroup" rowspan="${exercise.sets.length}">${esc(exercise.name)}${WorkoutData.signedLoad(exercise.name)?'<small>− assistance / + added</small>':/Dumbbell/.test(exercise.name)?'<small>Per dumbbell</small>':''}</th>`:''}<td>${index+1}</td><td>${esc(WorkoutData.formatWeight(exercise.name,set.weight))} lb</td><td>${esc(set.reps)}</td></tr>`).join('')}</tbody>`).join('')}</table>`;
 }
 function renderHistory(){
+ renderDraftLog();
  const owner=currentUser?.id||'guest';
  if(historyOwner!==owner){historyOwner=owner;expandedHistory.clear();$('historyRoutine').value=''}
  const selected=$('historyRoutine').value;

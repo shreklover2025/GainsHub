@@ -32,3 +32,18 @@ test('skipped exercises survive backups and invalid skip metadata is rejected',(
  assert.deepEqual(WorkoutData.parseBackup({sessions:[s]})[0].skippedExercises,['Standing Calf Raises','Seated Calf Raises']);
  for(const bad of [[{}],['__proto__'],'Bench']){s.skippedExercises=bad;assert.throws(()=>WorkoutData.parseBackup({sessions:[s]}))}
 });
+test('legacy pull-up assistance migrates once; signed positive loads stay positive',()=>{
+ const legacy=sample();legacy.exercises=[{name:'Assisted Pull-Ups',sets:[{weight:40,reps:8}]}];
+ const migrated=WorkoutData.normalizeSession(legacy);
+ assert.equal(migrated.exercises[0].name,'Pull-Ups');
+ assert.equal(migrated.exercises[0].sets[0].weight,-40);
+ assert.equal(WorkoutData.normalizeSession(migrated).exercises[0].sets[0].weight,-40);
+ const added={...migrated,exercises:[{name:'Assisted Pull-Ups',sets:[{weight:10,reps:8}]}]};
+ assert.equal(WorkoutData.parseBackup({sessions:[added]})[0].exercises[0].sets[0].weight,10);
+ for(const name of ['Assisted Pull-Ups','Chest Dips']){
+  const signed={...migrated,exercises:[{name,sets:[{weight:-25,reps:8},{weight:0,reps:8},{weight:10,reps:8}]}]};
+  assert.deepEqual(WorkoutData.normalizeSession(signed).exercises[0].sets.map(set=>set.weight),[-25,0,10]);
+ }
+ const invalid=sample();invalid.exercises[0].sets[0].weight=-10;
+ assert.throws(()=>WorkoutData.normalizeSession(invalid));
+});
