@@ -30,7 +30,7 @@ function setRowsMarkup(name){
  const previous=latestExercise(name,editingId)?.exercise.sets||[];
  return `<div class="log-grid log-grid-head" aria-hidden="true"><span>SET</span><span>PREVIOUS</span><span>LB</span><span>REPS</span><span>✓</span></div>`+draft[name].map((set,index)=>{
   const last=previous[index];
-  return `<div class="setrow log-grid ${set.completed?'is-complete':''}"><span class="set-number">${index+1}</span><span class="previous-set">${last?`${esc(WorkoutData.formatWeight(name,last.weight))} × ${esc(last.reps)}`:'—'}</span>${weightInputMarkup(name,set,index)}<input aria-label="${esc(name)} set ${index+1} reps" inputmode="numeric" type="number" min="1" max="100" placeholder="—" data-field="reps" data-index="${index}" value="${esc(set.reps)}"><label class="set-check"><input type="checkbox" data-complete="${index}" aria-label="${esc(name)} set ${index+1} completed" ${set.completed?'checked':''}><span class="check-glyph" aria-hidden="true">✓</span><span class="check-spinner" aria-hidden="true"></span></label></div>`;
+  return `<div class="setrow log-grid ${set.completed?'is-complete':''}"><span class="set-number">${index+1}</span><span class="previous-set">${last?`${esc(WorkoutData.formatWeight(name,last.weight))} × ${esc(last.reps)}`:'—'}</span>${weightInputMarkup(name,set,index)}<input aria-label="${esc(name)} set ${index+1} reps" inputmode="numeric" type="number" min="1" max="100" placeholder="—" data-field="reps" data-index="${index}" value="${esc(set.reps)}"><label class="set-check"><input type="checkbox" data-complete="${index}" aria-label="${esc(name)} set ${index+1} completed" ${set.completed?'checked':''}><span class="check-glyph" aria-hidden="true">✓</span><span class="check-spinner" aria-hidden="true"></span></label></div><div data-plate-for="${index}" class="plate-guide-slot">${plateGuideMarkup(name,set.weight,index)}</div>`;
  }).join('');
 }
 function showSetError(message){
@@ -45,7 +45,11 @@ async function toggleLoggedSet(name,index,input){
  const row=input.closest('.setrow');
  set.completed=completed;setRowState(set,row);showSetError('');
  try{saveDraft()}catch(error){set.completed=previous;input.checked=previous;setRowState(set,row);showSetError(error.message);return}
- const restToken=completed?startRest(name):0;
+ let restToken=0;
+ if(completed){
+  if(index===2){if(restExercise===name)stopRest()}
+  else restToken=startRest(name);
+ }
  if(!cloud||!currentUser){return} // Guests retain the same local draft behavior.
  if(!navigator.onLine){$('draftStatus').textContent='Offline · set saved on this device. Finish & Save Workout queues the session for sync.';return}
  const userId=currentUser.id,draftId=liveWorkoutId,client=cloud,token=crypto.randomUUID();

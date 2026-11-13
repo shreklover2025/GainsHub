@@ -221,7 +221,7 @@ function refreshSuggestedWeights(){
   if(input===document.activeElement)return;
   const weight=previousWeight(name);
   if(String(set.weight)===weight)return;
-  set.weight=weight;set.loadSign=Number(weight)<0?-1:1;if(input)input.value=WorkoutData.signedLoad(name)&&weight!==''?Math.abs(Number(weight)):weight;updateLoadControls(name,index);changed=true;
+  set.weight=weight;set.loadSign=Number(weight)<0?-1:1;if(input)input.value=WorkoutData.signedLoad(name)&&weight!==''?Math.abs(Number(weight)):weight;updateLoadControls(name,index);updatePlateGuide(name,index);changed=true;
  }));
  if(changed&&draftDirty)saveDraft();
 }
@@ -285,7 +285,7 @@ function renderSets(name){
  const el=$('sets-'+Object.keys(draft).indexOf(name));
  el.innerHTML=setRowsMarkup(name);
  draft[name].forEach((set,index)=>setRowState(set,el.querySelectorAll('.setrow')[index]));
- el.querySelectorAll('[data-field]').forEach(inp=>inp.oninput=()=>{const set=draft[name][+inp.dataset.index];if(inp.dataset.field==='weight'&&WorkoutData.signedLoad(name)){const sign=set.loadSign??(Number(set.weight)<0?-1:1);set.loadSign=sign;set.weight=inp.value===''?'':String(Math.abs(Number(inp.value))*sign);updateLoadControls(name,+inp.dataset.index)}else set[inp.dataset.field]=inp.value;set.autoWeight=false;saveDraft()});
+ el.querySelectorAll('[data-field]').forEach(inp=>inp.oninput=()=>{const set=draft[name][+inp.dataset.index];if(inp.dataset.field==='weight'&&WorkoutData.signedLoad(name)){const sign=set.loadSign??(Number(set.weight)<0?-1:1);set.loadSign=sign;set.weight=inp.value===''?'':String(Math.abs(Number(inp.value))*sign);updateLoadControls(name,+inp.dataset.index)}else set[inp.dataset.field]=inp.value;set.autoWeight=false;updatePlateGuide(name,+inp.dataset.index);saveDraft()});
  el.querySelectorAll('[data-load-sign]').forEach(button=>button.onclick=()=>{
   const index=Number(button.dataset.setIndex),set=draft[name][index];
   if(set.completed||pendingSetWrites.size)return;

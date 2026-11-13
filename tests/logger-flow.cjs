@@ -16,6 +16,13 @@ const {createServer}=require('../tools/serve.cjs');
   });
   const first=page.locator('[data-exercise-card]').first();const checkbox=first.locator('[data-complete]').first();
   assert.equal(await first.locator('.previous-set').textContent(),'100 × 8');
+  await first.locator('[data-field="weight"]').fill('225');
+  assert.match(await first.locator('.plate-guide').textContent(),/45 lb bar \+ 90 lb per side/);
+  assert.match(await first.locator('.plate-guide').textContent(),/Each side: 2 x 45 lb plates/);
+  await first.locator('[data-field="weight"]').fill('205');
+  assert.match(await first.locator('.plate-guide').textContent(),/1 x 45 lb plate, 1 x 25 lb plate, and 1 x 10 lb plate/);
+  await first.locator('[data-field="weight"]').fill('207.5');
+  assert.match(await first.locator('.plate-guide').textContent(),/Nearest totals: 205 lb or 210 lb/);
   await first.locator('[data-field="weight"]').fill('105');await first.locator('[data-field="reps"]').fill('9');
   await checkbox.check();
   assert.equal(await first.locator('[data-rest-for]').isVisible(),true);
@@ -57,6 +64,13 @@ const {createServer}=require('../tools/serve.cjs');
   assert.equal(await first.locator('.setrow').count(),2);
   await first.locator('.exercise-menu>summary').click();await first.locator('[data-menu-remove][data-set-index="1"]').click();
   assert.equal(await first.locator('.setrow').count(),1);
+  for(let index=1;index<=2;index++){
+   await first.locator('[data-add]').click();
+   await first.locator('[data-field="weight"]').nth(index).fill('105');
+   await first.locator('[data-field="reps"]').nth(index).fill('8');
+   await first.locator('[data-complete]').nth(index).check();await page.waitForFunction(()=>pendingSetWrites.size===0);
+   assert.equal(await first.locator('[data-rest-for]').isVisible(),index!==2,'Set 3 must not start the rest timer');
+  }
   await page.evaluate(()=>{cloud=null;resetWorkout('Upper Body');sessions=[]});
   for(const name of ['Pull-Ups','Chest Dips']){
    const card=page.locator('[data-exercise-card="'+name+'"]');
@@ -85,6 +99,13 @@ const {createServer}=require('../tools/serve.cjs');
   await page.locator('[data-history-id]').first().locator('summary').first().click();
   assert.match(await page.locator('#historyList').textContent(),/\+45 lb/);
   await page.locator('[data-tab="logger"]').click();
+  await page.evaluate(()=>{resetWorkout('Lower — Squat Focus')});
+  const calves=page.locator('[data-exercise-card="Seated Calf Raises"]');
+  await calves.locator('[data-field="weight"]').fill('150');
+  assert.match(await calves.locator('.plate-guide').textContent(),/60 lb machine starting weight \+ 45 lb per side/);
+  const belt=page.locator('[data-exercise-card="Belt Squat Machine"]');
+  await belt.locator('[data-field="weight"]').fill('248');
+  assert.match(await belt.locator('.plate-guide').textContent(),/68 lb machine starting weight \+ 90 lb per side/);
   for(const width of [320,393,768,1440]){
    await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   }
